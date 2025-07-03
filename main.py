@@ -14,29 +14,29 @@ class makeButton:
         #self.root = tk.Tk()
         #self.canvas = tk.Canvas(self.root, width=500, height=500)
         
-        width = int(area[2] - area[0])
-        height = int(area[3]-area[1])
+        width  = int(area[2] - area[0])
+        height = int(area[3] - area[1])
         self.img           = ImageTk.PhotoImage(Image.open(img_path).resize((width, height)))
         self.img_dark      = ImageTk.PhotoImage(Image.open(dark_path).resize((width, height)))
         self.img_lock      = ImageTk.PhotoImage(Image.open(lock_path).resize((width, height)))
         self.img_attention = ImageTk.PhotoImage(Image.open(attention_path).resize((width, height)))
         
-        self.area = area
-        self.stay_time = HOVER_TIME#滞留時間
+        self.area       = area
+        self.stay_time  = HOVER_TIME#滞留時間
         self.enter_time = None#領域内にカーソルが入った時刻
-        self.clicked = False#クリック状態か
-        self.locked = False#ロック状態か
-        self.arc_id = None#アークのキャンパスID
+        self.clicked    = False#クリック状態か
+        self.locked     = False#ロック状態か
+        self.arc_id     = None#アークのキャンパスID
         self.arc_radius = ARC_RADIUS#半径
-        self.cmd = cmd#コマンド(半角一文字)
-        self.step = 1#現在の段階
+        self.cmd        = cmd#コマンド(半角一文字)
+        self.step       = 1#現在の段階
 
         self.image_id = self.canvas.create_image(area[0], area[1], image = self.img, anchor="nw")#描画
     
     def reset(self):
         self.enter_time = None
-        self.clicked = False
-        self.locked = False
+        self.clicked    = False
+        self.locked     = False
         self.canvas.itemconfig(self.image_id, image=self.img)
         if self.arc_id:
             self.canvas.delete(self.arc_id)
@@ -54,8 +54,6 @@ class makeButton:
         )
         self.canvas.itemconfig(self.image_id, image = self.img_attention)
 
-        
-    
     def update(self, cursor_x, cursor_y):
         x1, y1, x2, y2 = self.area
         if x1 <= cursor_x <= x2 and y1 <= cursor_y <= y2:
