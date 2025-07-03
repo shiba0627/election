@@ -2,7 +2,7 @@
 視線の滞留を用いて投票を行う
 ## Setup & Run<初回のみ>
 ```PowerShell
-#git clone https://github.com/shiba0627/copy_Excel.git
+git clone https://github.com/shiba0627/election.git
 cd election
 python -m venv venv_election
 .\venv_election\Scripts\activate 
