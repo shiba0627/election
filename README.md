@@ -7,6 +7,7 @@ cd election
 python -m venv venv_election
 .\venv_election\Scripts\activate 
 python -m pip install -r requirements.txt 
+
 python main.py
 ```
 
