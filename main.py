@@ -31,7 +31,7 @@ class makeButton:
         self.cmd        = cmd#コマンド(半角一文字)
         self.step       = 1#現在の段階
 
-        self.image_id = self.canvas.create_image(area[0], area[1], image = self.img, anchor="nw")#描画
+        self.image_id = self.canvas.create_image(area[0], area[1], image = self.img_lock, anchor="nw")#描画
     
     def reset(self):
         self.enter_time = None
