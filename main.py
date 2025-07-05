@@ -1,133 +1,199 @@
+#令和最新版。
 import tkinter as tk
 from PIL import Image, ImageTk
 import time
-from config import YES, YES_WAIT, YES_SELECTED
-from config import NO, NO_SELECTED, NO_WAIT
-from config import BUTTON_SIZE, HOVER_TIME, ARC_RADIUS
-from config import CANDIDATES_WHIDTH, CANDIDATES_HEIGHT
-from config import CANDIDATES_1, CANDIDATES_1_SELECTED, CANDIDATES_1_WAIT
+from config import YES, YES_WAIT, YES_SELECTED, NO, NO_SELECTED, NO_WAIT
+from config import BUTTON_SIZE, HOVER_TIME, ARC_RADIUS, CANDIDATES_WHIDTH, CANDIDATES_HEIGHT
+from config import CANDIDATES_1, CANDIDATES_1_SELECTED, CANDIDATES_1_WAIT_SELECTED, CANDIDATES_1_WAIT
 
-class makeButton:
-    def __init__(self, canvas, img_path, dark_path, lock_path, attention_path, area, cmd, step):
+# ボタンの親クラス
+class BaseButton:
+    def __init__(self, canvas, img_path, wait_path, wait_selected_path, selected_path, area, cmd, step):
         self.canvas = canvas
+        width, height = int(area[2] - area[0]), int(area[3] - area[1])
 
-        #self.root = tk.Tk()
-        #self.canvas = tk.Canvas(self.root, width=500, height=500)
-        
-        width  = int(area[2] - area[0])
-        height = int(area[3] - area[1])
-        self.img           = ImageTk.PhotoImage(Image.open(img_path).resize((width, height)))
-        self.img_dark      = ImageTk.PhotoImage(Image.open(dark_path).resize((width, height)))
-        self.img_lock      = ImageTk.PhotoImage(Image.open(lock_path).resize((width, height)))
-        self.img_attention = ImageTk.PhotoImage(Image.open(attention_path).resize((width, height)))
-        
+        self.img               = ImageTk.PhotoImage(Image.open(img_path).resize((width, height)))
+        self.img_wait          = ImageTk.PhotoImage(Image.open(wait_path).resize((width, height)))
+        self.img_wait_selected = ImageTk.PhotoImage(Image.open(wait_selected_path).resize((width, height)))
+        self.img_selected      = ImageTk.PhotoImage(Image.open(selected_path).resize((width, height)))
+
+        # パラメータ設定
+        self.my_step    = step
+        self.my_cmd     = cmd
         self.area       = area
-        self.stay_time  = HOVER_TIME#滞留時間
-        self.enter_time = None#領域内にカーソルが入った時刻
-        self.clicked    = False#クリック状態か
-        self.locked     = False#ロック状態か
-        self.arc_id     = None#アークのキャンパスID
-        self.arc_radius = ARC_RADIUS#半径
-        self.cmd        = cmd#コマンド(半角一文字)
-        self.step       = 1#現在の段階
-
-        self.image_id = self.canvas.create_image(area[0], area[1], image = self.img_lock, anchor="nw")#描画
-    
-    def reset(self):
+        self.stay_time  = HOVER_TIME
         self.enter_time = None
-        self.clicked    = False
-        self.locked     = False
-        self.canvas.itemconfig(self.image_id, image=self.img)
-        if self.arc_id:
-            self.canvas.delete(self.arc_id)
-            self.arc_id = None
-    
+        self.arc_id     = None
+        self.arc_radius = ARC_RADIUS
+
+        self.image_id = self.canvas.create_image(area[0], area[1], image=self.img, anchor="nw")
+
     def draw_arc(self, x, y, percent):
         if self.arc_id:
             self.canvas.delete(self.arc_id)
         angle = percent * 3.6
         self.arc_id = self.canvas.create_arc(
-            x - self.arc_radius, y - self.arc_radius,
+            x - self.arc_radius, y - self.arc_radius, 
             x + self.arc_radius, y + self.arc_radius,
-            start = 90, extent=-angle, style = 'pieslice',
-            outline = 'black', fill = 'black'
+            start=90, extent=-angle, style='pieslice',
+            outline='black', fill='blue'
         )
-        self.canvas.itemconfig(self.image_id, image = self.img_attention)
 
-    def update(self, cursor_x, cursor_y):
+    def _handle_hover(self, cursor_x, cursor_y):
         x1, y1, x2, y2 = self.area
         if x1 <= cursor_x <= x2 and y1 <= cursor_y <= y2:
-            if not self.clicked:#クリック状態でないなら(滞留中なら)
-                if self.enter_time is None:
-                    self.enter_time = time.time()
-                elapsed = time.time() - self.enter_time#滞留時間
-                percent = min(elapsed / self.stay_time * 100, 100)
-                self.draw_arc(cursor_x + 40, cursor_y, percent)
-
-                if elapsed >= self.stay_time:
-                    print(f'{self.cmd}')
-                    self.canvas.itemconfig(self.image_id, image = self.img_dark)
-                    self.clicked = True
-                    if self.arc_id:
-                        self.canvas.delete(self.arc_id)
-                        self.arc_id = None
+            if self.enter_time is None:
+                self.enter_time = time.time()
+            elapsed = time.time() - self.enter_time
+            percent = min(elapsed / self.stay_time * 100, 100)
+            self.draw_arc(cursor_x + 40, cursor_y, percent)
+            
+            if elapsed >= self.stay_time:#一定時間滞留したら
+                if self.arc_id:#アークがあるなら
+                    self.canvas.delete(self.arc_id)#アークを消す
+                    self.arc_id = None
+                return self.my_cmd
         else:
-            self.reset()
+            self.enter_time = None
+            if self.arc_id:
+                self.canvas.delete(self.arc_id)
+                self.arc_id = None
+        return None
 
-class GUIApp():
+    def update(self, cursor_x, cursor_y, current_step, selected_candidate, last_decision):
+        #サブクラスで実装するメソッド
+        raise NotImplementedError
+
+# 候補者ボタン用のクラス
+class CandidateButton(BaseButton):
+    def update(self, cursor_x, cursor_y, current_step, selected_candidate, last_decision):
+        # 見た目の制御
+        if current_step in [1, 2]:
+            image_to_show = self.img_wait_selected if self.my_cmd == selected_candidate else self.img_wait
+        else:
+            image_to_show = self.img_selected if self.my_cmd == selected_candidate else self.img
+        self.canvas.itemconfig(self.image_id, image=image_to_show)
+
+        # 操作の制御
+        if current_step not in [1, 2] or self.my_cmd == selected_candidate:
+            return None
+        return self._handle_hover(cursor_x, cursor_y)
+
+# Yes/Noボタン用のクラス
+class YesNoButton(BaseButton):
+    def update(self, cursor_x, cursor_y, current_step, selected_candidate, last_decision):
+        image_to_show = self.img # デフォルトは通常画像
+
+        if current_step == 4:
+            # 最終決定に至った 'y1' と 'y2' ボタンを選択済みで表示
+            if self.my_cmd in ['y1', 'y2']:
+                image_to_show = self.img_selected
+            else:
+                image_to_show = self.img
+        # 通常のステップのロジック
+        elif self.my_step == current_step:
+            image_to_show = self.img_wait
+        elif self.my_cmd == last_decision:
+            image_to_show = self.img_selected
+        
+        self.canvas.itemconfig(self.image_id, image=image_to_show)
+        # ステップ4では操作不可にする
+        if self.my_step != current_step or current_step == 4:
+            return None
+            
+        return self._handle_hover(cursor_x, cursor_y)
+
+class GUIApp:
     def __init__(self):
+        self.step = 1
+        self.selected_candidate = None
+        self.last_decision = None
+
         self.root = tk.Tk()
         self.root.state("zoomed")
-        self.root.update_idletasks()#ウィンドウ準備完了を待つ
-        self.width = self.root.winfo_width()
-        self.height = self.root.winfo_height()
+        self.root.update_idletasks()
+        self.width, self.height = self.root.winfo_width(), self.root.winfo_height()
+        self.canvas = tk.Canvas(self.root, bg="white", width=self.width, height=self.height)
+        self.canvas.pack(fill="both", expand=True)
 
-        self.canvas = tk.Canvas(self.root, width=self.width, height=self.height)
-        self.canvas.pack(fill="both", expand=True)#canvas = window
-
-        #ボタンの設定(通常, dark, ロック, 滞留中, 中心X, 中心Y, 横長さ, 縦長さ, コマンド, 段階)
         button_list = [
-            (CANDIDATES_1, CANDIDATES_1_SELECTED, CANDIDATES_1,CANDIDATES_1_WAIT,  6/100,5/10,CANDIDATES_WHIDTH, CANDIDATES_HEIGHT,'1',1),
-            (CANDIDATES_1, CANDIDATES_1_SELECTED, CANDIDATES_1,CANDIDATES_1_WAIT, 17/100,5/10,CANDIDATES_WHIDTH, CANDIDATES_HEIGHT,'2',1),
-            (CANDIDATES_1, CANDIDATES_1_SELECTED, CANDIDATES_1,CANDIDATES_1_WAIT, 28/100,5/10,CANDIDATES_WHIDTH, CANDIDATES_HEIGHT,'3',1),
-            (CANDIDATES_1, CANDIDATES_1_SELECTED, CANDIDATES_1,CANDIDATES_1_WAIT, 39/100,5/10,CANDIDATES_WHIDTH, CANDIDATES_HEIGHT,'4',1),
-            (CANDIDATES_1, CANDIDATES_1_SELECTED, CANDIDATES_1,CANDIDATES_1_WAIT, 50/100,5/10,CANDIDATES_WHIDTH, CANDIDATES_HEIGHT,'5',1),
-            (CANDIDATES_1, CANDIDATES_1_SELECTED, CANDIDATES_1,CANDIDATES_1_WAIT, 61/100,5/10,CANDIDATES_WHIDTH, CANDIDATES_HEIGHT,'6',1),
-            (YES, YES_SELECTED, YES, YES_WAIT, 75/100, 3/8, BUTTON_SIZE, BUTTON_SIZE,'a',2),
-            (NO , NO_SELECTED ,  NO,  NO_WAIT, 90/100, 3/8, BUTTON_SIZE, BUTTON_SIZE,'b',2),
-            (YES, YES_SELECTED, YES, YES_WAIT, 75/100, 6/8, BUTTON_SIZE, BUTTON_SIZE,'c',3),
-            (NO , NO_SELECTED ,  NO,  NO_WAIT, 90/100, 6/8, BUTTON_SIZE, BUTTON_SIZE,'d',3),
+            (CANDIDATES_1, CANDIDATES_1_WAIT, CANDIDATES_1_WAIT_SELECTED, CANDIDATES_1_SELECTED, 0.06, 0.5, CANDIDATES_WHIDTH, CANDIDATES_HEIGHT, '1' , 1),
+            (CANDIDATES_1, CANDIDATES_1_WAIT, CANDIDATES_1_WAIT_SELECTED, CANDIDATES_1_SELECTED, 0.17, 0.5, CANDIDATES_WHIDTH, CANDIDATES_HEIGHT, '2' , 1),
+            (CANDIDATES_1, CANDIDATES_1_WAIT, CANDIDATES_1_WAIT_SELECTED, CANDIDATES_1_SELECTED, 0.28, 0.5, CANDIDATES_WHIDTH, CANDIDATES_HEIGHT, '3' , 1),
+            (CANDIDATES_1, CANDIDATES_1_WAIT, CANDIDATES_1_WAIT_SELECTED, CANDIDATES_1_SELECTED, 0.39, 0.5, CANDIDATES_WHIDTH, CANDIDATES_HEIGHT, '4' , 1),
+            (CANDIDATES_1, CANDIDATES_1_WAIT, CANDIDATES_1_WAIT_SELECTED, CANDIDATES_1_SELECTED, 0.50, 0.5, CANDIDATES_WHIDTH, CANDIDATES_HEIGHT, '5' , 1),
+            (YES         , YES_WAIT         , YES_SELECTED              , YES_SELECTED         , 0.75, 3/8, BUTTON_SIZE      , BUTTON_SIZE      , 'y1', 2),
+            (NO          , NO_WAIT          , NO_SELECTED               , NO_SELECTED          , 0.90, 3/8, BUTTON_SIZE      , BUTTON_SIZE      , 'n1', 2),
+            (YES         , YES_WAIT         , YES_SELECTED              , YES_SELECTED         , 0.75, 6/8, BUTTON_SIZE      , BUTTON_SIZE      , 'y2', 3),
+            (NO          , NO_WAIT          , NO_SELECTED               , NO_SELECTED          , 0.90, 6/8, BUTTON_SIZE      , BUTTON_SIZE      , 'n2', 3),
         ]
         
         self.buttons = []
-        for img_path, clicked_path, lock_path, attention_path, center_x_ratio, center_y_ratio, w,h,char,step in button_list:
-            center_x = center_x_ratio * self.width
-            center_y = center_y_ratio * self.height
-            area = self.calc_area(center_x, center_y, w, h)
-            self.buttons.append(makeButton(self.canvas, img_path, clicked_path, lock_path, attention_path, area, char, step))
+        for img_path, wait_path, wait_sel_path, sel_path, cx_r, cy_r, w, h, cmd, step in button_list:
+            center_x, center_y = cx_r * self.width, cy_r * self.height
+            area = (center_x - w/2, center_y - h/2, center_x + w/2, center_y + h/2)
+            
+            if 'y' in cmd or 'n' in cmd:
+                self.buttons.append(YesNoButton(self.canvas, img_path, wait_path, wait_sel_path, sel_path, area, cmd, step))
+            else:
+                self.buttons.append(CandidateButton(self.canvas, img_path, wait_path, wait_sel_path, sel_path, area, cmd, step))
         
         self.check_cursor()
 
-    def calc_area(self, center_x, center_y, width, height):
-        half_width = width // 2
-        half_height = height // 2
-        return (center_x - half_width, center_y - half_height, center_x + half_width, center_y + half_height)
-
     def check_cursor(self):
-        """
-        カーソル位置を定期的に取得
-        """
         x = self.root.winfo_pointerx() - self.root.winfo_rootx()
         y = self.root.winfo_pointery() - self.root.winfo_rooty()
-        for button in self.buttons:
-            button.update(x,y)
+        
+        command = None
+        # ステップ4ではボタン操作を無効にする
+        if self.step != 4:
+            for button in self.buttons:
+                result = button.update(x, y, self.step, self.selected_candidate, self.last_decision)
+                if result:
+                    command = result
+                    break
+        # ステップ4に入ったら表示だけを更新し続ける
+        else:
+            for button in self.buttons:
+                button.update(x, y, self.step, self.selected_candidate, self.last_decision)
+
+
+        if command:
+            if self.step == 1 and command.isdigit():
+                self.selected_candidate = command
+                self.step = 2
+                print(f"候補者 {self.selected_candidate} を選択。ステップ2へ。")
+            elif self.step == 2:
+                if command.isdigit():
+                    self.selected_candidate = command
+                    self.last_decision = None
+                    print(f"候補者を {self.selected_candidate} に変更。")
+                elif command in ['y1', 'n1']:
+                    self.last_decision = command
+                    if command == 'y1':
+                        self.step = 3
+                        print("一回目の確認で「はい」。ステップ3へ。")
+                    else: # n1
+                        self.step = 1
+                        self.selected_candidate = None
+                        self.last_decision = None
+                        print("一回目の確認で「いいえ」。ステップ1へ。")
+            elif self.step == 3 and command in ['y2', 'n2']:
+                self.last_decision = command
+                if command == 'y2':
+                    self.step = 4 # ステップ4へ。
+                    print(f"候補者 {self.selected_candidate}で確定。")
+                else: # n2
+                    self.step = 1
+                    self.selected_candidate = None
+                    self.last_decision = None
+                    print("二回目の確認で「いいえ」。ステップ１へ。")
+
         self.root.after(20, self.check_cursor)
-    
+
     def run(self):
         self.root.mainloop()
-    
-def main():
+
+if __name__ == '__main__':
     app = GUIApp()
     app.run()
-if __name__ == '__main__':
-    main()
